@@ -1,0 +1,108 @@
+### Fleet Telemetry Monitoring Service - Next.js
+@baseUrl = http://localhost:3000
+@vehicleId = v-12
+@otherVehicleId = v-13
+
+### Health
+GET {{baseUrl}}/health
+
+### Fleet state
+GET {{baseUrl}}/fleet/state
+
+### All vehicles
+GET {{baseUrl}}/vehicles
+
+### Dashboard aggregate
+GET {{baseUrl}}/api/dashboard
+
+### Zone counts
+GET {{baseUrl}}/zones/counts
+
+### Recent anomalies
+GET {{baseUrl}}/anomalies?limit=25
+
+### Recent warnings
+GET {{baseUrl}}/warnings?limit=25
+
+### Client simulator tick
+POST {{baseUrl}}/api/simulator/tick
+
+### Create vehicle token
+POST {{baseUrl}}/auth/vehicle-token
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}"
+}
+
+> {%
+  client.global.set("vehicleToken", response.body.token);
+%}
+
+### Valid telemetry with zone entry
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:00Z",
+  "lat": 37.4100,
+  "lon": -122.0800,
+  "battery_pct": 78,
+  "speed_mps": 1.2,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": "pack_station"
+}
+
+### Low battery warning, not anomaly
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:05Z",
+  "lat": 37.4101,
+  "lon": -122.0801,
+  "battery_pct": 12,
+  "speed_mps": 1.1,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### Token mismatch rejection
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{otherVehicleId}}",
+  "timestamp": "2026-05-24T00:04:00Z",
+  "lat": 37.41,
+  "lon": -122.08,
+  "battery_pct": 80,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### Unknown zone validation
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:05:00Z",
+  "lat": 37.41,
+  "lon": -122.08,
+  "battery_pct": 80,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": "unknown_zone"
+}

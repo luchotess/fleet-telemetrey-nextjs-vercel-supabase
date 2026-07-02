@@ -1,0 +1,91 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fleet
+          POSTGRES_PASSWORD: fleet
+          POSTGRES_DB: fleet_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U fleet -d fleet_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fleet:fleet@localhost:5433/fleet_test?schema=public
+      DIRECT_URL: postgresql://fleet:fleet@localhost:5433/fleet_test?schema=public
+      JWT_SECRET: test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_ALGORITHM: ${{ secrets.JWT_ALGORITHM || 'HS256' }}
+      STALE_AFTER_SECONDS: ${{ secrets.STALE_AFTER_SECONDS || '10' }}
+      SIMULATOR_TICK_RATE_LIMIT_REQUESTS: ${{ secrets.SIMULATOR_TICK_RATE_LIMIT_REQUESTS || '120' }}
+      SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS: ${{ secrets.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS || '60' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate production secrets
+        run: test -n "$DATABASE_URL" && test -n "$DIRECT_URL" && test -n "$JWT_SECRET"
+      - run: npm run db:migrate
+      - run: npm install -g vercel@50.25.1
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build with production environment
+        run: >-
+          vercel build --prod
+          --build-env DATABASE_URL="${{ secrets.DATABASE_URL }}"
+          --build-env DIRECT_URL="${{ secrets.DIRECT_URL }}"
+          --build-env JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          --build-env JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}"
+          --build-env STALE_AFTER_SECONDS="${{ env.STALE_AFTER_SECONDS }}"
+          --build-env SIMULATOR_TICK_RATE_LIMIT_REQUESTS="${{ env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS }}"
+          --build-env SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS="${{ env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS }}"
+          --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy with runtime environment
+        run: >-
+          vercel deploy --prebuilt --prod
+          --env DATABASE_URL="${{ secrets.DATABASE_URL }}"
+          --env DIRECT_URL="${{ secrets.DIRECT_URL }}"
+          --env JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          --env JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}"
+          --env STALE_AFTER_SECONDS="${{ env.STALE_AFTER_SECONDS }}"
+          --env SIMULATOR_TICK_RATE_LIMIT_REQUESTS="${{ env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS }}"
+          --env SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS="${{ env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS }}"
+          --token=${{ secrets.VERCEL_TOKEN }}

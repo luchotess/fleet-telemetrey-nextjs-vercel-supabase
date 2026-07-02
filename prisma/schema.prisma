@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Vehicle {
+  vehicleId        String   @id @map("vehicle_id") @db.VarChar(32)
+  latestTimestamp  DateTime? @map("latest_timestamp") @db.Timestamptz(6)
+  status           String   @default("idle") @db.VarChar(32)
+  batteryPct       Int?     @map("battery_pct")
+  speedMps         Float?   @map("speed_mps")
+  lat              Float?
+  lon              Float?
+  activeMissionId  Int?     @map("active_mission_id")
+  staleEpisodeOpen Boolean  @default(false) @map("stale_episode_open")
+
+  anomalies          Anomaly[]
+  maintenanceRecords MaintenanceRecord[]
+  missions           Mission[]
+  sessions           TelemetrySession[]
+  telemetryEvents    TelemetryEvent[]
+  warnings           WarningRecord[]
+
+  @@map("vehicles")
+}
+
+model TelemetrySession {
+  id        String   @id @db.VarChar(36)
+  vehicleId String   @map("vehicle_id") @db.VarChar(32)
+  issuedAt  DateTime @map("issued_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  vehicle         Vehicle          @relation(fields: [vehicleId], references: [vehicleId])
+  telemetryEvents TelemetryEvent[]
+
+  @@index([vehicleId], map: "ix_telemetry_sessions_vehicle_id")
+  @@index([expiresAt], map: "ix_telemetry_sessions_expires_at")
+  @@map("telemetry_sessions")
+}
+
+model TelemetryEvent {
+  id          Int      @id @default(autoincrement())
+  vehicleId   String   @map("vehicle_id") @db.VarChar(32)
+  sessionId   String   @map("session_id") @db.VarChar(36)
+  timestamp   DateTime @db.Timestamptz(6)
+  lat         Float
+  lon         Float
+  batteryPct  Int      @map("battery_pct")
+  speedMps    Float    @map("speed_mps")
+  status      String   @db.VarChar(32)
+  errorCodes  Json     @default("[]") @map("error_codes") @db.JsonB
+  zoneEntered String?  @map("zone_entered") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  anomalies          Anomaly[]
+  maintenanceRecords MaintenanceRecord[]
+  session            TelemetrySession  @relation(fields: [sessionId], references: [id])
+  vehicle            Vehicle           @relation(fields: [vehicleId], references: [vehicleId])
+  warnings           WarningRecord[]
+
+  @@index([vehicleId], map: "ix_telemetry_events_vehicle_id")
+  @@index([sessionId], map: "ix_telemetry_events_session_id")
+  @@index([timestamp], map: "ix_telemetry_events_timestamp")
+  @@map("telemetry_events")
+}
+
+model Anomaly {
+  id               Int      @id @default(autoincrement())
+  vehicleId        String   @map("vehicle_id") @db.VarChar(32)
+  telemetryEventId Int?     @map("telemetry_event_id")
+  type             String   @db.VarChar(64)
+  severity         String   @db.VarChar(16)
+  timestamp        DateTime @db.Timestamptz(6)
+  details          Json     @default("{}") @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  telemetryEvent TelemetryEvent? @relation(fields: [telemetryEventId], references: [id])
+  vehicle        Vehicle         @relation(fields: [vehicleId], references: [vehicleId])
+
+  @@index([vehicleId], map: "ix_anomalies_vehicle_id")
+  @@index([type], map: "ix_anomalies_type")
+  @@index([timestamp], map: "ix_anomalies_timestamp")
+  @@map("anomalies")
+}
+
+model WarningRecord {
+  id               Int      @id @default(autoincrement())
+  vehicleId        String   @map("vehicle_id") @db.VarChar(32)
+  telemetryEventId Int?     @map("telemetry_event_id")
+  type             String   @db.VarChar(64)
+  timestamp        DateTime @db.Timestamptz(6)
+  details          Json     @default("{}") @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  telemetryEvent TelemetryEvent? @relation(fields: [telemetryEventId], references: [id])
+  vehicle        Vehicle         @relation(fields: [vehicleId], references: [vehicleId])
+
+  @@index([vehicleId], map: "ix_warnings_vehicle_id")
+  @@index([type], map: "ix_warnings_type")
+  @@index([timestamp], map: "ix_warnings_timestamp")
+  @@map("warnings")
+}
+
+model ZoneCount {
+  zoneId     String @id @map("zone_id") @db.VarChar(64)
+  entryCount BigInt @default(0) @map("entry_count")
+
+  @@map("zone_counts")
+}
+
+model Mission {
+  id          Int      @id @default(autoincrement())
+  vehicleId   String   @map("vehicle_id") @db.VarChar(32)
+  status      String   @default("active") @db.VarChar(32)
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [vehicleId])
+
+  @@index([vehicleId], map: "ix_missions_vehicle_id")
+  @@map("missions")
+}
+
+model MaintenanceRecord {
+  id               Int      @id @default(autoincrement())
+  vehicleId        String   @map("vehicle_id") @db.VarChar(32)
+  telemetryEventId Int?     @map("telemetry_event_id")
+  reason           String   @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  telemetryEvent TelemetryEvent? @relation(fields: [telemetryEventId], references: [id])
+  vehicle        Vehicle         @relation(fields: [vehicleId], references: [vehicleId])
+
+  @@index([vehicleId], map: "ix_maintenance_records_vehicle_id")
+  @@map("maintenance_records")
+}
+
+model DomainEventLog {
+  id          Int      @id @default(autoincrement())
+  eventType   String   @map("event_type") @db.VarChar(64)
+  aggregateId String?  @map("aggregate_id") @db.VarChar(64)
+  payload     Json     @default("{}") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([eventType], map: "ix_domain_event_logs_event_type")
+  @@index([aggregateId], map: "ix_domain_event_logs_aggregate_id")
+  @@map("domain_event_logs")
+}
+
+model TelemetryRateLimitHit {
+  id         BigInt   @id @default(autoincrement())
+  vehicleId  String   @map("vehicle_id") @db.VarChar(32)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([vehicleId, occurredAt], map: "ix_rate_limit_hits_vehicle_time")
+  @@index([occurredAt], map: "ix_rate_limit_hits_occurred_at")
+  @@map("telemetry_rate_limit_hits")
+}
+
+model ApiRateLimitHit {
+  id         BigInt   @id @default(autoincrement())
+  scope      String   @db.VarChar(64)
+  identifier String   @db.VarChar(96)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([scope, identifier, occurredAt], map: "ix_api_rate_limit_scope_identifier_time")
+  @@index([occurredAt], map: "ix_api_rate_limit_occurred_at")
+  @@map("api_rate_limit_hits")
+}
