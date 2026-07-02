@@ -22,7 +22,7 @@ interface SimulationTickClaim {
 const AUTO_TICK_EVENT_TYPE = "simulator.auto_tick";
 const AUTO_TICK_LOCK_KEY = "fleet-simulator-auto-tick";
 const AUTO_SIMULATION_TICK_INTERVAL_MS = 3000;
-const DEFAULT_SIMULATION_TICK_LIMIT = 10;
+const DEFAULT_SIMULATION_TICK_LIMIT = 5;
 
 const statuses: VehicleStatus[] = ["moving", "idle", "charging"];
 
