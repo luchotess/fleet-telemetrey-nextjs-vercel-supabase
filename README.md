@@ -42,8 +42,8 @@ The client calls a serverless tick endpoint every 3 seconds:
 curl -X POST "https://<your-vercel-domain>/api/simulator/tick"
 ```
 
-Each accepted tick writes one telemetry event per vehicle through the same
-persistence, anomaly, warning, zone count, stale telemetry, and domain event
+Each accepted dashboard tick writes a small batch of telemetry events through the
+same persistence, anomaly, warning, zone count, stale telemetry, and domain event
 logic as the public telemetry API. The endpoint uses a Postgres advisory lock
 and a `domain_event_logs` marker so multiple open tabs coalesce to at most one
 accepted tick every 3 seconds. It also applies a Postgres-backed IP/user-agent
@@ -111,4 +111,6 @@ Set GitHub repository secrets:
 - `DIRECT_URL`
 - `JWT_SECRET`
 
-The production workflow runs `prisma migrate deploy`, then `vercel build`, then `vercel deploy --prebuilt --prod`.
+The production workflow runs `prisma migrate deploy`, ensures idempotent
+reference data for vehicles/zones, then runs `vercel build` and
+`vercel deploy --prebuilt --prod`.

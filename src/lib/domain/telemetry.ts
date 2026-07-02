@@ -3,7 +3,7 @@ import {
   LOW_BATTERY_THRESHOLD,
   ZONES,
 } from "@/lib/constants";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, WRITE_TRANSACTION_OPTIONS } from "@/lib/db";
 import { detectAnomalies, nearestPriorTelemetry } from "@/lib/domain/anomaly";
 import { requireActiveSession } from "@/lib/domain/auth";
 import { buildEvent, writeDomainEventLogs } from "@/lib/domain/events";
@@ -70,24 +70,27 @@ export async function persistTelemetry(
     ];
 
     const anomalySpecs = await detectAnomalies(tx, payload, previous);
-    for (const spec of anomalySpecs) {
-      await tx.anomaly.create({
-        data: {
+    if (anomalySpecs.length > 0) {
+      await tx.anomaly.createMany({
+        data: anomalySpecs.map((spec) => ({
           vehicleId: payload.vehicle_id,
           telemetryEventId: telemetryEvent.id,
           type: spec.type,
           severity: spec.severity,
           timestamp: payload.timestamp,
           details: spec.details,
-        },
+        })),
       });
-      events.push(
-        buildEvent("AnomalyDetected", payload.vehicle_id, {
-          type: spec.type,
-          severity: spec.severity,
-          telemetry_event_id: telemetryEvent.id,
-        }),
-      );
+
+      for (const spec of anomalySpecs) {
+        events.push(
+          buildEvent("AnomalyDetected", payload.vehicle_id, {
+            type: spec.type,
+            severity: spec.severity,
+            telemetry_event_id: telemetryEvent.id,
+          }),
+        );
+      }
     }
 
     const warnings: string[] = [];
@@ -150,7 +153,7 @@ export async function persistTelemetry(
       anomalies: anomalySpecs.map((spec) => spec.type),
       warnings,
     };
-  });
+  }, WRITE_TRANSACTION_OPTIONS);
 
   return {
     telemetry_event_id: result.telemetry_event_id,

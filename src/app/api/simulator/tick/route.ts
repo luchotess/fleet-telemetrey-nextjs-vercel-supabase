@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { handleApiError, ok, readJson } from "@/lib/api/responses";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, WRITE_TRANSACTION_OPTIONS } from "@/lib/db";
 import { getAppEnv } from "@/lib/env";
 import { enforceApiRateLimit } from "@/lib/domain/rate-limit";
 import { runCoalescedSimulationTick } from "@/lib/domain/simulator";
@@ -38,14 +38,16 @@ export async function POST(request: NextRequest) {
     const identity = clientIdentity(request);
     const env = getAppEnv();
 
-    await getPrisma().$transaction((tx) =>
-      enforceApiRateLimit(tx, {
-        scope: "simulator_tick",
-        identifier: identity,
-        limit: env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS,
-        windowSeconds: env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS,
-        message: "Simulator tick rate limit exceeded",
-      }),
+    await getPrisma().$transaction(
+      (tx) =>
+        enforceApiRateLimit(tx, {
+          scope: "simulator_tick",
+          identifier: identity,
+          limit: env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS,
+          windowSeconds: env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS,
+          message: "Simulator tick rate limit exceeded",
+        }),
+      WRITE_TRANSACTION_OPTIONS,
     );
 
     const result = await runCoalescedSimulationTick({ limit: input.limit });

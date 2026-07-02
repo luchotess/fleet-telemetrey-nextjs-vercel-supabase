@@ -86,6 +86,7 @@ const freshnessColors: Record<string, string> = {
   stale: "var(--chart-2)",
   never_seen: "var(--chart-3)",
 };
+const DASHBOARD_SIMULATOR_TICK_LIMIT = 10;
 const simulatorToneClasses: Record<SimulatorStatus["tone"], string> = {
   idle: "border-border text-muted-foreground",
   running: "border-[var(--chart-4)]/30 bg-[var(--chart-4)]/10 text-[var(--chart-4)]",
@@ -324,6 +325,8 @@ export function FleetDashboard() {
         const response = await fetch("/api/simulator/tick", {
           method: "POST",
           cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ limit: DASHBOARD_SIMULATOR_TICK_LIMIT }),
         });
         const body = (await response.json()) as SimulatorTickResponse;
 

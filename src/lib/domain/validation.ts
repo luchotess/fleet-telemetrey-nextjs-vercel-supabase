@@ -78,5 +78,5 @@ export const listQuerySchema = z.object({
 });
 
 export const simulatorTickRequestSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(50),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
 });

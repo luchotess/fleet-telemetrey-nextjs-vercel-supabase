@@ -360,9 +360,9 @@ describe.sequential("fleet service", () => {
     const second = await runCoalescedSimulationTick();
 
     expect(first.skipped).toBe(false);
-    expect(first.accepted).toBe(50);
+    expect(first.accepted).toBe(10);
     expect(second.skipped).toBe(true);
-    await expect(prisma.telemetryEvent.count()).resolves.toBe(50);
+    await expect(prisma.telemetryEvent.count()).resolves.toBe(10);
     await expect(
       prisma.domainEventLog.count({
         where: { eventType: "simulator.auto_tick" },

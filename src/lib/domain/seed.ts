@@ -4,19 +4,19 @@ import { ZONES } from "@/lib/constants";
 type SeedClient = PrismaClient | Prisma.TransactionClient;
 
 export async function seedReferenceData(prisma: SeedClient) {
-  for (let i = 1; i <= 50; i += 1) {
-    await prisma.vehicle.upsert({
-      where: { vehicleId: `v-${i}` },
-      update: {},
-      create: { vehicleId: `v-${i}`, status: "idle" },
-    });
-  }
+  await prisma.vehicle.createMany({
+    data: Array.from({ length: 50 }, (_, index) => ({
+      vehicleId: `v-${index + 1}`,
+      status: "idle" as const,
+    })),
+    skipDuplicates: true,
+  });
 
-  for (const zoneId of ZONES) {
-    await prisma.zoneCount.upsert({
-      where: { zoneId },
-      update: {},
-      create: { zoneId, entryCount: BigInt(0) },
-    });
-  }
+  await prisma.zoneCount.createMany({
+    data: ZONES.map((zoneId) => ({
+      zoneId,
+      entryCount: BigInt(0),
+    })),
+    skipDuplicates: true,
+  });
 }

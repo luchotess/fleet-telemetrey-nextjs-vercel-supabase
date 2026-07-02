@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Vehicle } from "@/generated/prisma/client";
 import { ZONES, type VehicleStatus } from "@/lib/constants";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, WRITE_TRANSACTION_OPTIONS } from "@/lib/db";
 import { persistTelemetry } from "@/lib/domain/telemetry";
 import type {
   CoalescedSimulationTickResult,
@@ -22,6 +22,7 @@ interface SimulationTickClaim {
 const AUTO_TICK_EVENT_TYPE = "simulator.auto_tick";
 const AUTO_TICK_LOCK_KEY = "fleet-simulator-auto-tick";
 const AUTO_SIMULATION_TICK_INTERVAL_MS = 3000;
+const DEFAULT_SIMULATION_TICK_LIMIT = 10;
 
 const statuses: VehicleStatus[] = ["moving", "idle", "charging"];
 
@@ -138,9 +139,15 @@ async function runSimulationTick(
   options: SimulationTickOptions = {},
 ): Promise<SimulationTickResult> {
   const prisma = getPrisma();
-  const limit = Math.min(Math.max(options.limit ?? 50, 1), 50);
+  const limit = Math.min(
+    Math.max(options.limit ?? DEFAULT_SIMULATION_TICK_LIMIT, 1),
+    50,
+  );
   const vehicles = await prisma.vehicle.findMany({
-    orderBy: { vehicleId: "asc" },
+    orderBy: [
+      { latestTimestamp: { sort: "asc", nulls: "first" } },
+      { vehicleId: "asc" },
+    ],
     take: limit,
   });
   const result: SimulationTickResult = {
@@ -213,7 +220,7 @@ async function claimAutoSimulationTick(
     });
 
     return { claimed: true };
-  });
+  }, WRITE_TRANSACTION_OPTIONS);
 }
 
 export async function runCoalescedSimulationTick(

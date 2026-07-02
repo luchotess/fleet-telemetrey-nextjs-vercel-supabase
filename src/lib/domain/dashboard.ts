@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient, Vehicle } from "@/generated/prisma/client";
 import { STALE_AFTER_SECONDS, ZONES, type Freshness } from "@/lib/constants";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, WRITE_TRANSACTION_OPTIONS } from "@/lib/db";
 import { buildEvent, writeDomainEventLogs } from "@/lib/domain/events";
 import {
   serializeAnomaly,
@@ -37,53 +37,52 @@ function freshnessFor(vehicle: Vehicle, now = new Date()): Freshness {
 async function evaluateStaleVehicles() {
   const prisma = getPrisma();
   await prisma.$transaction(async (tx) => {
+    const staleCutoff = new Date(Date.now() - STALE_AFTER_SECONDS * 1000);
     const rows = await tx.$queryRaw<StaleVehicleRow[]>`
       SELECT vehicle_id, latest_timestamp
       FROM vehicles
       WHERE latest_timestamp IS NOT NULL
+        AND latest_timestamp <= ${staleCutoff}
         AND stale_episode_open = false
       FOR UPDATE
     `;
     const now = new Date();
-    const pendingEvents: DomainEvent[] = [];
 
-    for (const row of rows) {
-      const ageSeconds =
-        (now.getTime() - row.latest_timestamp.getTime()) / 1000;
-      if (ageSeconds <= STALE_AFTER_SECONDS) {
-        continue;
-      }
-
-      await tx.anomaly.create({
-        data: {
-          vehicleId: row.vehicle_id,
-          telemetryEventId: null,
-          type: "STALE_TELEMETRY",
-          severity: "medium",
-          timestamp: now,
-          details: {
-            latest_timestamp: row.latest_timestamp.toISOString(),
-            stale_after_seconds: STALE_AFTER_SECONDS,
-          },
-        },
-      });
-      await tx.vehicle.update({
-        where: { vehicleId: row.vehicle_id },
-        data: { staleEpisodeOpen: true },
-      });
-      pendingEvents.push(
-        buildEvent("TelemetryBecameStale", row.vehicle_id, {
-          latest_timestamp: row.latest_timestamp.toISOString(),
-        }),
-        buildEvent("AnomalyDetected", row.vehicle_id, {
-          type: "STALE_TELEMETRY",
-          severity: "medium",
-        }),
-      );
+    if (rows.length === 0) {
+      return;
     }
 
+    await tx.anomaly.createMany({
+      data: rows.map((row) => ({
+        vehicleId: row.vehicle_id,
+        telemetryEventId: null,
+        type: "STALE_TELEMETRY",
+        severity: "medium",
+        timestamp: now,
+        details: {
+          latest_timestamp: row.latest_timestamp.toISOString(),
+          stale_after_seconds: STALE_AFTER_SECONDS,
+        },
+      })),
+    });
+
+    await tx.vehicle.updateMany({
+      where: { vehicleId: { in: rows.map((row) => row.vehicle_id) } },
+      data: { staleEpisodeOpen: true },
+    });
+
+    const pendingEvents: DomainEvent[] = rows.flatMap((row) => [
+      buildEvent("TelemetryBecameStale", row.vehicle_id, {
+        latest_timestamp: row.latest_timestamp.toISOString(),
+      }),
+      buildEvent("AnomalyDetected", row.vehicle_id, {
+        type: "STALE_TELEMETRY",
+        severity: "medium",
+      }),
+    ]);
+
     await writeDomainEventLogs(pendingEvents, tx);
-  });
+  }, WRITE_TRANSACTION_OPTIONS);
 }
 
 async function vehicleStatesFrom(

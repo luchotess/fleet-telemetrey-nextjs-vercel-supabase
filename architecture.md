@@ -146,6 +146,8 @@ Important behavior:
 
 - Multiple open tabs are coalesced by an advisory lock and a domain event marker.
 - Only one accepted simulator tick can run in the configured interval.
+- Dashboard ticks process a small batch of least-recently-updated vehicles so a
+  Vercel request does not try to update the full fleet at once.
 - Other tabs receive `skipped: true` and keep the UI alive without writing data.
 - Public abuse is limited with a Postgres-backed IP/user-agent rate limit.
 
@@ -342,6 +344,8 @@ Runtime variables are validated in `src/lib/env.ts`.
   per-client rate limit.
 - `prisma migrate deploy` must run before the app uses a database, especially
   after adding `api_rate_limit_hits`.
+- Production deploys also run idempotent reference-data bootstrap for missing
+  vehicles/zones; it does not delete telemetry or reset counters.
 - Prisma is lazily initialized so builds do not require live runtime services.
 - The production deploy workflow validates required secrets before build/deploy.
 
