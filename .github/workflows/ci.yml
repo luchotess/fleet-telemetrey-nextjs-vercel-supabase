@@ -68,24 +68,15 @@ jobs:
       - run: npm install -g vercel@50.25.1
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - name: Build with production environment
-        run: >-
-          vercel build --prod
-          --build-env DATABASE_URL="${{ secrets.DATABASE_URL }}"
-          --build-env DIRECT_URL="${{ secrets.DIRECT_URL }}"
-          --build-env JWT_SECRET="${{ secrets.JWT_SECRET }}"
-          --build-env JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}"
-          --build-env STALE_AFTER_SECONDS="${{ env.STALE_AFTER_SECONDS }}"
-          --build-env SIMULATOR_TICK_RATE_LIMIT_REQUESTS="${{ env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS }}"
-          --build-env SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS="${{ env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS }}"
-          --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
       - name: Deploy with runtime environment
         run: >-
           vercel deploy --prebuilt --prod
-          --env DATABASE_URL="${{ secrets.DATABASE_URL }}"
-          --env DIRECT_URL="${{ secrets.DIRECT_URL }}"
-          --env JWT_SECRET="${{ secrets.JWT_SECRET }}"
-          --env JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}"
-          --env STALE_AFTER_SECONDS="${{ env.STALE_AFTER_SECONDS }}"
-          --env SIMULATOR_TICK_RATE_LIMIT_REQUESTS="${{ env.SIMULATOR_TICK_RATE_LIMIT_REQUESTS }}"
-          --env SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS="${{ env.SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS }}"
+          --env DATABASE_URL="$DATABASE_URL"
+          --env DIRECT_URL="$DIRECT_URL"
+          --env JWT_SECRET="$JWT_SECRET"
+          --env JWT_ALGORITHM="$JWT_ALGORITHM"
+          --env STALE_AFTER_SECONDS="$STALE_AFTER_SECONDS"
+          --env SIMULATOR_TICK_RATE_LIMIT_REQUESTS="$SIMULATOR_TICK_RATE_LIMIT_REQUESTS"
+          --env SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS="$SIMULATOR_TICK_RATE_LIMIT_WINDOW_SECONDS"
           --token=${{ secrets.VERCEL_TOKEN }}
