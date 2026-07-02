@@ -65,6 +65,7 @@ jobs:
       - name: Validate production secrets
         run: test -n "$DATABASE_URL" && test -n "$DIRECT_URL" && test -n "$JWT_SECRET"
       - run: npm run db:migrate
+      - run: npm run db:seed
       - run: npm install -g vercel@50.25.1
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - name: Build with production environment
